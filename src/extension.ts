@@ -20,19 +20,32 @@ const init = async (argv: Arguments<{ name: string }>) => {
   await fs.promises.mkdir(argv.name)
 
   // 2. Create index.js
-  const indexPath = path('index.js')
-  await fs.promises.writeFile(indexPath, `console.log('Hello, ${argv.name}!')`)
+  const indexPath = path('index.html')
+  await fs.promises.writeFile(indexPath, `<html>
+  <head>
+    <title>Elfsquad Extension</title>
+  </head>
+  <body>
+    <h1>Hello Elfsquad!</h1>
+  </body>
+</html>`)
   console.log(chalk.green(`Created ${indexPath}`))
 
   // 3. Create elfsquadrc.yml
   const rcPath = path('elfsquadrc.yml')
   const rcContent = `name: "${argv.name}"
 
-buttons:
-- name: "${argv.name}"
-  actions:
-  - type: "dialog"
-    entrypoint: "index.js"
+executables:
+  - name: "example"
+    type: "dialog"
+    entrypoint: "index.html"
+
+page_actions:
+  - name: "Test"
+    identifier: "extension test"
+    page: "quotation"
+    executables:
+    - "example"
 `;
 
   await fs.promises.writeFile(rcPath, rcContent)
