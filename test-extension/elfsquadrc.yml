@@ -1,0 +1,10 @@
+id: b6de9149-18f5-4048-a78c-b347f45704c6
+name: "test-extension"
+
+buttons:
+- name: "Test extension"
+  identifier: "test-extension"
+  page: "quotation"
+  actions:
+  - type: "dialog"
+    entrypoint: "index.html"

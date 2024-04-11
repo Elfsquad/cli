@@ -1,0 +1,12 @@
+{
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --outfile=dist/index.js"
+  },
+  "dependencies": {
+    "@elfsquad/custom-scripting": "file:../custom-scripting/dist"
+  },
+  "devDependencies": {
+    "esbuild": "0.20.2",
+    "typescript": "^5.4.5"
+  }
+}
