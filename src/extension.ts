@@ -18,38 +18,15 @@ const init = async (argv: Arguments<{ name: string }>) => {
 
   // 1. Create a new directory with the name of the extension
   await fs.promises.mkdir(argv.name)
+  const srcDir = path('src')
+  await fs.promises.mkdir(srcDir)
 
-  // 2. Create index.js
-  const indexPath = path('index.html')
-  await fs.promises.writeFile(indexPath, `<html>
-  <head>
-    <title>Elfsquad Extension</title>
-  </head>
-  <body>
-    <h1>Hello Elfsquad!</h1>
-  </body>
-</html>`)
-  console.log(chalk.green(`Created ${indexPath}`))
-
-  // 3. Create elfsquadrc.yml
-  const rcPath = path('elfsquadrc.yml')
-  const rcContent = `name: "${argv.name}"
-
-executables:
-  - name: "example"
-    type: "dialog"
-    entrypoint: "index.html"
-
-page_actions:
-  - name: "Test"
-    identifier: "extension test"
-    page: "quotation"
-    executables:
-    - "example"
-`;
-
-  await fs.promises.writeFile(rcPath, rcContent)
-  console.log(chalk.green(`Created ${rcPath}`))
+  // 2. Create sample files
+  for (const [filename, content] of Object.entries(SAMPLE_FILES)) {
+    const fileName = path(filename)
+    await fs.promises.writeFile(fileName, content)
+    console.log(chalk.green(`Created ${fileName}`))
+  }
 }
 
 const publish = async () => {
@@ -97,5 +74,64 @@ const publish = async () => {
   }
   await response.json()
   console.log(chalk.green('Extension published successfully'))
+}
+
+const SAMPLE_FILES = {
+  'package.json': `{
+  "name": "test-extension",
+  "scripts": {
+    "build": "tsc -noEmit && esbuild src/index.ts --bundle --platform=node --outfile=dist/index.js && cp src/index.html dist/index.html"
+  },
+  "devDependencies": {
+    "esbuild": "^0.12.0",
+    "typescript": "^4.3.5"
+  },
+  "dependencies": {
+    "@elfsquad/custom-scripting": "^0.0.4"
+  }
+}`,
+  'elfsquadrc.yml': `name: "test-extension"
+
+page_extensions:
+  quotation:
+    actions:
+    - identifier: "dialog"
+      name: "Open dialog"
+      executable: 
+        type: "dialog"
+        entrypoint: "index.html"
+`,
+  'src/index.ts': `import { ui, dialog } from '@elfsquad/custom-scripting';
+
+const reloadButton = document.getElementById('reloadButton');
+reloadButton!.addEventListener('click', async () => {
+  ui.reload();
+});
+
+const closeButton = document.getElementById('closeButton');
+closeButton!.addEventListener('click', async () => {
+  dialog.close();
+});
+`,
+  'src/index.html': `<html>
+  <head>
+    <title>Elfsquad Extension</title>
+    <script src="index.js" type="module" defer></script>
+  </head>
+  <body>
+    <button id="reloadButton">Reload data</button>
+    <button id="closeButton">Close dialog</button>
+  </body>
+</html>`,
+  'tsconfig.json': `{
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "outDir": "./dist",
+    "module": "nodenext"
+  }
+}`
 }
 
