@@ -78,6 +78,15 @@ const saveTokenAsync = async (token: any) => {
   const home = process.env.HOME || process.env.USERPROFILE
   const elfsquadDirPath = `${home}/.elfsquad`
   const authPath = `${elfsquadDirPath}/auth.json`
+
+  //parse jwt token
+  const jwt = token.access_token.split('.')[1]
+  const buff = Buffer.from(jwt, 'base64')
+  const payload = buff.toString('utf-8')
+  const payloadJson = JSON.parse(payload)
+  const tokenSetAt = payloadJson.iat
+  token.created_at = tokenSetAt;
+  
   await fs.promises.mkdir(elfsquadDirPath, { recursive: true })
   await fs.promises.writeFile(authPath, JSON.stringify(token, null, 2))
 }
