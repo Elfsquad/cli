@@ -8,12 +8,30 @@ import JSZip from 'jszip'
 export const register = (cli: Argv) => {
   cli.command("extension", "Manage extensions", (builder) => {
     builder.demandCommand(1, 'You need at least one command')
-    builder.command<{ name: string }>("init <name>", "initialize a new extension", () => {}, init)
+    builder.command<{ name: string, template: 'dialog' | 'action' }>("init <name>", "initialize a new extension", (yargs) => {
+        return yargs
+            .positional('name', {
+                describe: 'Name of the extension',
+                type: 'string'
+            })
+            .option('template', {
+                describe: 'Template to use',
+                alias: 't',
+                type: 'string',
+                choices: ['dialog', 'action'],
+                required: true
+            })
+    }, init)
     builder.command("publish", "publish the extension", () => {}, publish)
   });
 }
 
-const init = async (argv: Arguments<{ name: string }>) => {
+const init = async (argv: Arguments<{ name: string, template: string }>) => {
+  const templates: Record<string, Record<string, string>>  = {
+    dialog: DIALOG_SAMPLE_FILES,
+    action: ACTION_SAMPLE_FILES
+  }
+
   const path = (suffix: string) => `${argv.name}/${suffix}`;
 
   // 1. Create a new directory with the name of the extension
@@ -22,9 +40,10 @@ const init = async (argv: Arguments<{ name: string }>) => {
   await fs.promises.mkdir(srcDir)
 
   // 2. Create sample files
-  for (const [filename, content] of Object.entries(SAMPLE_FILES)) {
+  const files = templates[argv.template]
+  for (const [filename, content] of Object.entries(files)) {
     const fileName = path(filename)
-    await fs.promises.writeFile(fileName, content)
+    await fs.promises.writeFile(fileName, content.replace('{{ EXTENSION_NAME }}', argv.name))
     console.log(chalk.green(`Created ${fileName}`))
   }
 }
@@ -54,7 +73,7 @@ const publish = async () => {
 
   // 4. Upload the zip file to the server
   const accessToken = await getAccessToken()
-  const url = 'http://localhost:5101/api/2/extensions'
+  const url = 'https://api.elfsquad.io/api/2/extensions'
   const zipBlob = new Blob([zipContent], { type: 'application/zip' });
 
   const formData = new FormData()
@@ -76,11 +95,10 @@ const publish = async () => {
   console.log(chalk.green('Extension published successfully'))
 }
 
-const SAMPLE_FILES = {
-  'package.json': `{
-  "name": "test-extension",
+const defaultPackageJson = `{
+  "name": "{{ EXTENSION_NAME }}",
   "scripts": {
-    "build": "tsc -noEmit && esbuild src/index.ts --bundle --platform=node --outfile=dist/index.js && cp src/index.html dist/index.html"
+    "build": "{{ BUILD }}"
   },
   "devDependencies": {
     "esbuild": "^0.12.0",
@@ -89,19 +107,26 @@ const SAMPLE_FILES = {
   "dependencies": {
     "@elfsquad/custom-scripting": "^0.0.4"
   }
-}`,
-  'elfsquadrc.yml': `name: "test-extension"
+}`;
+
+const DIALOG_SAMPLE_FILES = {
+  'package.json': defaultPackageJson.replace('{{ BUILD }}', 'tsc src/*.ts -noEmit && esbuild src/index.ts --bundle --platform=node --outfile=dist/index.js && cp src/index.html dist/index.html'),
+  'elfsquadrc.yml': `identifier: "{{ EXTENSION_NAME }}"
 
 page_extensions:
   quotation:
     actions:
-    - identifier: "dialog"
-      name: "Open dialog"
+    - position: right
+      color: primary
+
+      names:
+        en: Execute
+
       executable: 
         type: "dialog"
         entrypoint: "index.html"
 `,
-  'src/index.ts': `import { ui, dialog } from '@elfsquad/custom-scripting';
+  'src/index.ts': `import { ui, dialog, api } from '@elfsquad/custom-scripting';
 
 const reloadButton = document.getElementById('reloadButton');
 reloadButton!.addEventListener('click', async () => {
@@ -135,3 +160,23 @@ closeButton!.addEventListener('click', async () => {
 }`
 }
 
+const ACTION_SAMPLE_FILES = {
+  'package.json': defaultPackageJson.replace('{{ BUILD }}', 'tsc src/*.ts -noEmit && esbuild src/index.ts --bundle --platform=node --outfile=dist/index.js'),
+  'elfsquadrc.yml': `identifier: "{{ EXTENSION_NAME }}"
+page_extensions:
+  quotation:
+    actions:
+    - position: right
+      color: primary
+
+      names:
+        en: Execute
+
+      executable: 
+        type: "action"
+        entrypoint: "index.js"
+`,
+  'src/index.ts': `import { api } from '@elfsquad/custom-scripting';
+
+alert('Hello from my Elfsquad extension!');`
+}

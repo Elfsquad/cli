@@ -37,7 +37,9 @@ const login = async (argv: Arguments) => {
     }
     const response = await exchangeCodeForTokenAsync(code)
     await saveTokenAsync(response)
-    res.end('Logged in! You can close this tab now.')
+    res.end(`<body>
+    <p>Logged in! You can close this tab now.</p>
+</body>`);
     console.log(chalk.green("Logged in!"))
     server.close()
   }).listen(8888)
