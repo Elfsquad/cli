@@ -15,7 +15,7 @@ export const getAccessToken = async () => {
   try {
     const content = fs.readFileSync(authPath, 'utf8')
     const token = JSON.parse(content)
-    const expiresAt = token.created_at + token.expires_in
+    const expiresAt = token.created_at * 1000 + token.expires_in * 1000
 
     if (Date.now() > expiresAt) {
       return await refreshAccessTokenAsync(token.refresh_token)
