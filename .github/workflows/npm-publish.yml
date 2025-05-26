@@ -12,7 +12,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm run build
+      - run: npm run install
 
   publish-npm:
     needs: build
