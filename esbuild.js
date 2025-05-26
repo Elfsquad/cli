@@ -30,6 +30,9 @@ esbuild.build({
     target: 'node20',
     platform: 'node',
     format: 'esm',
+    banner: {
+        js: '#!/usr/bin/env node',
+    },
     plugins: [resolveVendorModulesPlugin],
 })
 .then(async (result) => {
