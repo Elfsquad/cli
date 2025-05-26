@@ -3,6 +3,8 @@ import chalk from 'chalk'
 import fs from 'fs'
 import { getAccessToken } from './auth.js'
 import JSZip from 'jszip'
+import { exec } from 'child_process'
+
 
 
 export const register = (cli: Argv) => {
@@ -18,7 +20,7 @@ export const register = (cli: Argv) => {
                 describe: 'Template to use',
                 alias: 't',
                 type: 'string',
-                choices: ['dialog', 'action'],
+                choices: ['dialog', 'action', 'instant'],
                 required: true
             })
     }, init)
@@ -29,12 +31,17 @@ export const register = (cli: Argv) => {
 const init = async (argv: Arguments<{ name: string, template: string }>) => {
   const templates: Record<string, Record<string, string>>  = {
     dialog: DIALOG_SAMPLE_FILES,
-    action: ACTION_SAMPLE_FILES
+    action: ACTION_SAMPLE_FILES,
+    instant: INSTANT_SAMPLE_FILES
   }
 
   const path = (suffix: string) => `${argv.name}/${suffix}`;
 
   // 1. Create a new directory with the name of the extension
+  if (fs.existsSync(argv.name)) {
+    console.error(chalk.red(`Directory ${argv.name} already exists. Please choose a different name.`));
+    return;
+  }
   await fs.promises.mkdir(argv.name)
   const srcDir = path('src')
   await fs.promises.mkdir(srcDir)
@@ -46,6 +53,22 @@ const init = async (argv: Arguments<{ name: string, template: string }>) => {
     await fs.promises.writeFile(fileName, content.replace('{{ EXTENSION_NAME }}', argv.name))
     console.log(chalk.green(`Created ${fileName}`))
   }
+
+  // 3. Run npm install and wait for it to finish
+  console.log(chalk.green('Running npm install...'))
+  await new Promise<void>((resolve, reject) => {
+    exec('npm install', { cwd: argv.name }, (error, stdout, stderr) => {
+      if (error) {
+        console.error(chalk.red(`Error running npm install: ${error.message}`));
+        reject(error);
+      } else {
+        console.log(stdout);
+        resolve();
+      }
+    });
+  })
+
+  console.log(chalk.green(`Extension ${argv.name} initialized successfully!`))
 }
 
 const publish = async () => {
@@ -73,7 +96,7 @@ const publish = async () => {
 
   // 4. Upload the zip file to the server
   const accessToken = await getAccessToken()
-  const url = 'https://api.elfsquad.io/api/2/extensions'
+  const url = 'http://localhost:5101/api/2/extensions'
   const zipBlob = new Blob([zipContent], { type: 'application/zip' });
 
   const formData = new FormData()
@@ -110,7 +133,7 @@ const defaultPackageJson = `{
 }`;
 
 const DIALOG_SAMPLE_FILES = {
-  'package.json': defaultPackageJson.replace('{{ BUILD }}', 'tsc src/*.ts -noEmit && esbuild src/index.ts --bundle --platform=node --outfile=dist/index.js && cp src/index.html dist/index.html'),
+  'package.json': defaultPackageJson.replace('{{ BUILD }}', 'esbuild src/index.ts --bundle --platform=browser --target=es2015 --outfile=dist/index.js && cp src/index.html dist/index.html'),
   'elfsquadrc.yml': `identifier: "{{ EXTENSION_NAME }}"
 
 page_extensions:
@@ -120,11 +143,14 @@ page_extensions:
       color: primary
 
       names:
-        en: Execute
+        en: Open dialog
 
       executable: 
         type: "dialog"
         entrypoint: "index.html"
+        parameters:
+          width: 50vw
+          height: 70vh
 `,
   'src/index.ts': `import { ui, dialog, api } from '@elfsquad/custom-scripting';
 
@@ -170,7 +196,7 @@ page_extensions:
       color: primary
 
       names:
-        en: Execute
+        en: Execute action
 
       executable: 
         type: "action"
@@ -178,5 +204,20 @@ page_extensions:
 `,
   'src/index.ts': `import { api } from '@elfsquad/custom-scripting';
 
-alert('Hello from my Elfsquad extension!');`
+console.log('Hello from my Elfsquad extension!');`
 }
+
+const INSTANT_SAMPLE_FILES = {
+  'package.json': defaultPackageJson.replace('{{ BUILD }}', 'esbuild src/index.ts --bundle --platform=browser --target=es2015 --outfile=dist/index.js'),
+  'elfsquadrc.yml': `identifier: "{{ EXTENSION_NAME }}"
+
+page_extensions:
+  quotation:
+    actions:
+    - executable: 
+        type: "instant"
+        entrypoint: "index.js"
+`,
+  'src/index.ts': `alert('Hello from my Elfsquad instant extension!');`
+}
+
