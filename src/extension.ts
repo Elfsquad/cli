@@ -96,7 +96,7 @@ const publish = async () => {
 
   // 4. Upload the zip file to the server
   const accessToken = await getAccessToken()
-  const url = 'http://localhost:5101/api/2/extensions'
+  const url = 'https://api.elfsquad.io/api/2/extensions'
   const zipBlob = new Blob([zipContent], { type: 'application/zip' });
 
   const formData = new FormData()
