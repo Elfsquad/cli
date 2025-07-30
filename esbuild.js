@@ -24,12 +24,12 @@ const resolveVendorModulesPlugin = {
 
 esbuild.build({
     entryPoints: ['src/index.ts'],
-    outdir: 'dist',
     bundle: true,
     sourcemap: true,
     target: 'node20',
     platform: 'node',
-    format: 'esm',
+    format: 'cjs', // CommonJS output
+    outfile: 'dist/index.cjs', // Output file is .cjs
     banner: {
         js: '#!/usr/bin/env node',
     },

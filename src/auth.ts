@@ -45,7 +45,7 @@ const login = async (argv: Arguments) => {
   }).listen(8888)
 
   // 2. Open browser to the auth URL
-  const baseUrl = "https://login.elfsquad.io/oauth2/auth"
+  const baseUrl = "https://staging.login.elfsquad.io/oauth2/auth"
   const clientId = "elfsquad-cli"
   const redirectUri = "http://localhost:8888"
   const scope = "openid profile Elfskot.Api"
@@ -57,7 +57,7 @@ const login = async (argv: Arguments) => {
 }
 
 const exchangeCodeForTokenAsync = async (code: string) => {
-  const baseUrl = "https://login.elfsquad.io/oauth2/token"
+  const baseUrl = "https://staging.login.elfsquad.io/oauth2/token"
   const clientId = "elfsquad-cli"
   const grantType = "authorization_code"
   const redirectUri = "http://localhost:8888"
@@ -93,7 +93,7 @@ const saveTokenAsync = async (token: any) => {
 
 const refreshAccessTokenAsync = async (refreshToken: string) => {
   try {
-    const baseUrl = "https://login.elfsquad.io/oauth2/token"
+    const baseUrl = "https://staging.login.elfsquad.io/oauth2/token"
     const clientId = "elfsquad-cli"
     const grantType = "refresh_token"
 

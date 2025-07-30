@@ -23,8 +23,10 @@ export const register = (cli: Argv) => {
                 choices: ['dialog', 'action', 'instant'],
                 required: true
             })
-    }, init)
-    builder.command("publish", "publish the extension", () => {}, publish)
+    }, init);
+    builder.command("publish", "publish the extension", () => {}, publish);
+    builder.command("debug", "debug the extension in browser", () => {}, debug);
+
   });
 }
 
@@ -90,13 +92,13 @@ const publish = async () => {
   const zip = new JSZip()
   const files = fs.readdirSync('dist')
   for (const file of files) {
-    zip.file(file, fs.readFileSync(`dist/${file}`))
+    zip.file(file, fs.readFileSync(`dist/${file}`).toString());
   }
   const zipContent = await zip.generateAsync({ type: 'nodebuffer' })
 
   // 4. Upload the zip file to the server
   const accessToken = await getAccessToken()
-  const url = 'https://api.elfsquad.io/api/2/extensions'
+  const url = 'https://staging.api.elfsquad.io/api/2/extensions'
   const zipBlob = new Blob([zipContent], { type: 'application/zip' });
 
   const formData = new FormData()
@@ -116,6 +118,133 @@ const publish = async () => {
   }
   await response.json()
   console.log(chalk.green('Extension published successfully'))
+}
+
+const debug = async () => {
+  const ws = await import('ws');
+  const net = await import('net');
+  const chokidar = await import('chokidar');
+  let open;
+  try {
+    const openModule = await import('open');
+    open = openModule.default || openModule;
+  } catch (e) {
+    console.error(chalk.red('Failed to import "open" package.'));
+    return;
+  }
+
+  const getAvailablePort = () => new Promise<number>((resolve) => {
+    const server = net.createServer();
+    server.listen(0, () => {
+      const port = (server.address() as any).port;
+      server.close(() => resolve(port));
+    });
+  });
+
+  const port = await getAvailablePort();
+  const wss = new ws.WebSocketServer({ port });
+  console.log(chalk.green(`WebSocket server started on port ${port}`));
+
+  const emsUrl = `https://staging.ems.elfsquad.io?debugPort=${port}`;
+  if (open && typeof open === 'function' && typeof emsUrl === 'string' && emsUrl.length > 0) {
+    try {
+      await open(String(emsUrl));
+      console.log(chalk.green(`Opened EMS at ${emsUrl}`));
+    } catch (e) {
+      console.error(chalk.red('Failed to open browser with EMS URL:', e));
+    }
+  } else {
+    console.error(chalk.red('EMS URL is invalid, cannot open browser.'));
+  }
+
+  // Watch dist folder for changes
+  const watcher = chokidar.watch('dist', { ignoreInitial: false });
+
+  // Send initial files
+  const sendAllFiles = async (wsClient: any) => {
+    const files = fs.readdirSync('dist');
+    for (const file of files) {
+      const filePath = `dist/${file}`;
+      if (fs.statSync(filePath).isFile()) {
+        const content = fs.readFileSync(filePath, 'utf8');
+        wsClient.send(JSON.stringify({ type: 'update', filename: file, content }));
+      }
+    }
+    // Also send elfsquadrc.yml
+    if (fs.existsSync('elfsquadrc.yml')) {
+      const content = fs.readFileSync('elfsquadrc.yml', 'utf8');
+      wsClient.send(JSON.stringify({ type: 'update', filename: 'elfsquadrc.yml', content }));
+    }
+  };
+
+  wss.on('connection', (wsClient: any) => {
+    console.log(chalk.green('Browser connected'));
+    sendAllFiles(wsClient);
+  });
+
+  watcher.on('change', (filePath: string) => {
+    const filename = filePath.replace(/^dist\//, '');
+    const content = fs.readFileSync(filePath, 'utf8');
+    wss.clients.forEach((client: any) => {
+      if (client.readyState === ws.WebSocket.OPEN) {
+        client.send(JSON.stringify({ type: 'update', filename, content }));
+      }
+    });
+    console.log(chalk.yellow(`Sent update for ${filename}`));
+  });
+
+  watcher.on('add', (filePath: string) => {
+    const filename = filePath.replace(/^dist\//, '');
+    const content = fs.readFileSync(filePath, 'utf8');
+    wss.clients.forEach((client: any) => {
+      if (client.readyState === ws.WebSocket.OPEN) {
+        client.send(JSON.stringify({ type: 'update', filename, content }));
+      }
+    });
+    console.log(chalk.yellow(`Sent new file ${filename}`));
+  });
+
+  watcher.on('unlink', (filePath: string) => {
+    const filename = filePath.replace(/^dist\//, '');
+    wss.clients.forEach((client: any) => {
+      if (client.readyState === ws.WebSocket.OPEN) {
+        client.send(JSON.stringify({ type: 'delete', filename }));
+      }
+    });
+    console.log(chalk.yellow(`Sent delete for ${filename}`));
+  });
+
+  // Watch elfsquadrc.yml for changes
+  const rcWatcher = chokidar.watch('elfsquadrc.yml', { ignoreInitial: true });
+  rcWatcher.on('change', (filePath: string) => {
+    const filename = 'elfsquadrc.yml';
+    const content = fs.readFileSync(filePath, 'utf8');
+    wss.clients.forEach((client: any) => {
+      if (client.readyState === ws.WebSocket.OPEN) {
+        client.send(JSON.stringify({ type: 'update', filename, content }));
+      }
+    });
+    console.log(chalk.yellow(`Sent update for ${filename}`));
+  });
+  rcWatcher.on('add', (filePath: string) => {
+    const filename = 'elfsquadrc.yml';
+    const content = fs.readFileSync(filePath, 'utf8');
+    wss.clients.forEach((client: any) => {
+      if (client.readyState === ws.WebSocket.OPEN) {
+        client.send(JSON.stringify({ type: 'update', filename, content }));
+      }
+    });
+    console.log(chalk.yellow(`Sent new file ${filename}`));
+  });
+  rcWatcher.on('unlink', (filePath: string) => {
+    const filename = 'elfsquadrc.yml';
+    wss.clients.forEach((client: any) => {
+      if (client.readyState === ws.WebSocket.OPEN) {
+        client.send(JSON.stringify({ type: 'delete', filename }));
+      }
+    });
+    console.log(chalk.yellow(`Sent delete for ${filename}`));
+  });
 }
 
 const defaultPackageJson = `{
@@ -220,4 +349,6 @@ page_extensions:
 `,
   'src/index.ts': `alert('Hello from my Elfsquad instant extension!');`
 }
+
+
 
